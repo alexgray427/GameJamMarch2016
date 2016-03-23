@@ -1,9 +1,14 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class MatchManager : MonoBehaviour
 {
+	public delegate void MatchEventHandler();
+	public event MatchEventHandler OnUpdate;
+
 	public enum MatchState
 	{
 		Start,
@@ -11,35 +16,11 @@ public class MatchManager : MonoBehaviour
 		InWave,
 		End
 	}
-
-	public class PoolManager
-	{
-
-	}
-
-	[Serializable]
-	public struct WaveData
-	{
-		public SpawnData[] Spawns;
-	}
-
-	[Serializable]
-	public struct SpawnData
-	{
-		public string Name;
-	}
-
+		
 	public const float TIME_BETWEEN_WAVES = 10.0f;
 
 	public static MatchManager Instance { get; private set; }
-
-	public WaveData[] Waves;
-
-	public Agent Player;
-
-	private MatchState _state;
-	private float _waveCountDown;
-	private int _currentWave;
+	public Text WaveTimeText;
 
 	private void Awake()
 	{
@@ -47,35 +28,77 @@ public class MatchManager : MonoBehaviour
 			Instance = this;
 		else
 			Destroy(this);
-
-		_state = MatchState.Start;
-		_waveCountDown = TIME_BETWEEN_WAVES;
-		_currentWave = 0;
 	}
 
-	IEnumerator Start()
+	private void Update()
 	{
-		yield return StartCoroutine(CountDown());
+		if (OnUpdate != null)
+			OnUpdate();
+	}
+}
+
+public class Timer
+{
+	public delegate void TimeEventHandler(Timer sender);
+	public event TimeEventHandler OnTimeStart;
+	public event TimeEventHandler OnTimeFinish;
+
+	public float mSeconds { get; private set; }
+
+	public float mSecondsLeft
+	{
+		get { return _count; }
 	}
 
-	IEnumerator CountDown()
+	public bool mIsFinished
 	{
-		yield return new WaitForSeconds(TIME_BETWEEN_WAVES);
-		StartCoroutine(SpawnWave());
-		yield return null;
+		get { return !_active || _count <= 0.0f ? true : false; }
 	}
 
-	IEnumerator SpawnWave()
+	private float _count;
+	private bool _active;
+
+	public Timer(float seconds)
 	{
-		for(int cnt = 0; cnt < Waves[_currentWave].Spawns.Length; cnt++)
+		MatchManager.Instance.OnUpdate += Update;
+		mSeconds = seconds;
+		Reset();
+	}
+
+	public void Update()
+	{
+		if (_active)
 		{
-			Debug.Log("Spawned: " + Waves[_currentWave].Spawns[cnt].Name);
-			yield return new WaitForSeconds(0.5f);
-		}
+			if (_count > 0.0f)
+			{
+				_count -= Time.deltaTime;
+			}
+			else
+			{
+				Stop();
 
-		_currentWave++;
-		_state = MatchState.InWave;
-		_waveCountDown = TIME_BETWEEN_WAVES;
-		yield return null;
+				if (OnTimeFinish != null)
+					OnTimeFinish(this);
+			}
+		}
+	}
+
+	public void Start()
+	{
+		_active = true;
+
+		if (OnTimeStart != null)
+			OnTimeStart(this);
+	}
+
+	public void Stop()
+	{
+		_active = false;
+	}
+
+	public void Reset()
+	{
+		Stop();
+		_count = mSeconds;
 	}
 }

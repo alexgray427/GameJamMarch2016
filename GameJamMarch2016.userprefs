@@ -1,0 +1,18 @@
+﻿<Properties StartupItem="Assembly-CSharp.csproj">
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="Unity.Instance.Unity Editor" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="Assets\Knight.cs">
+    <Files>
+      <File FileName="Assets\MatchManager.cs" Line="79" Column="5" />
+      <File FileName="Assets\Agent.cs" Line="222" Column="24" />
+      <File FileName="Assets\Knight.cs" Line="11" Column="2" />
+      <File FileName="Assets\Orc.cs" Line="88" Column="34" />
+      <File FileName="Assets\Ghost.cs" Line="7" Column="40" />
+      <File FileName="Assets\Ghoul.cs" Line="7" Column="39" />
+      <File FileName="Assets\StackFSM.cs" Line="40" Column="18" />
+    </Files>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+</Properties>

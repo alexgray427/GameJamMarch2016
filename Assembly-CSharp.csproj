@@ -6,7 +6,7 @@
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <RootNamespace></RootNamespace>
-    <ProjectGuid>{069A6FB0-8FBB-BB34-6B8E-66E34E630288}</ProjectGuid>
+    <ProjectGuid>{360256B6-7DB8-E971-F93D-837BBFAC6CE8}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <AssemblyName>Assembly-CSharp</AssemblyName>
@@ -46,11 +46,16 @@
   </ItemGroup>
   <ItemGroup>
      <Compile Include="Assets\Agent.cs" />
+     <Compile Include="Assets\Ghost.cs" />
+     <Compile Include="Assets\Ghoul.cs" />
      <Compile Include="Assets\IsometricCamera.cs" />
+     <Compile Include="Assets\Knight.cs" />
      <Compile Include="Assets\MatchManager.cs" />
+     <Compile Include="Assets\Orc.cs" />
      <Compile Include="Assets\StackFSM.cs" />
      <None Include="Assets\Characters\MicroKnight\KnightAnimList.txt" />
      <None Include="Assets\CemeterySet\proto_cemetery_set_change_log.txt" />
+     <None Include="Assets\Characters\CharacterOverview.txt" />
      <None Include="Assets\Characters\MicroOrc\OrcAnimList.txt" />
      <None Include="Assets\Characters\MicroGhoul\GhoulAnimList.txt" />
      <None Include="Assets\CemeterySet\models\asset_animation_list.txt" />

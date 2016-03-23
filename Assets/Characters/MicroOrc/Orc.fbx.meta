@@ -65,8 +65,8 @@ ModelImporter:
     - serializedVersion: 16
       name: Orc
       takeName: Take 001
-      firstFrame: 1
-      lastFrame: 24
+      firstFrame: 121
+      lastFrame: 140
       wrapMode: 0
       orientationOffsetY: 0
       level: 0

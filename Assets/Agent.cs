@@ -5,49 +5,79 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(SphereCollider))]
-public class Agent : MonoBehaviour
+public abstract class Agent : MonoBehaviour
 {
-	public const float SEARCH_DELAY = 3.0f;
-	public const float ATTACK_DELAY = 2.0f;
+	/// <summary>
+	/// Health.
+	/// </summary>
+	public class Health
+	{
+		public delegate void HealthEventHandler();
+		public event HealthEventHandler OnDie;
+
+		private float _maxHealth;
+		private float _curHealth;
+
+		public float MaximumHealth
+		{
+			get { return _maxHealth; }
+		}
+
+		public float CurrentHealth
+		{
+			get { return _curHealth; }
+		}
+
+		public Health(float health)
+		{
+			_maxHealth = health;
+			_curHealth = health;
+		}
+
+		public void AddHealth(float amount)
+		{
+			_curHealth = Mathf.Clamp (_curHealth + amount, 0.0f, _maxHealth);
+		}
+
+		public void RemoveHealth(float amount)
+		{
+			_curHealth = Mathf.Clamp (_curHealth - amount, 0.0f, _maxHealth);
+
+			if (_curHealth == 0.0f && OnDie != null)
+			{
+				OnDie();
+			}
+		}
+      }
 
 	public enum FlagType { Knight, Orc, Ghost, Ghoul }
 
-	public bool IsPlayer;
-	public FlagType Flag;
-	public int AttackTypes;
-
 	public bool mIsAlive
 	{
-		get { return (gameObject.activeSelf && _curHealth > 0.0f); }
+		get { return (gameObject.activeSelf && _health.CurrentHealth > 0.0f); }
 	}
 
-	private Animator _anim;
-	private NavMeshAgent _navAgent;
-	private SphereCollider _collider;
+	public FlagType mFlag
+	{
+		get { return _flag; }
+	}
 
-	public StackFSM _stateMachine;
-	public List<Agent> _nearbyTargets;
-	public Agent _target;
-	public Vector3 _lastKnownPosition;
-	public float _speed;
-	public float _searchTimer;
-	public float _attackTimer;
+	public float MaxHealth;
 
-	//Move Health Later
-	public float _maxHealth;
-	public float _curHealth;
+	protected Animator _anim;
+	protected NavMeshAgent _navAgent;
+	protected SphereCollider _collider;
 
-//	private StackFSM _stateMachine;
-//	private List<Agent> _nearbyTargets;
-//	private Agent _target;
-//	private Vector3 _lastKnownPosition;
-//	private float _speed;
-//	private float _wanderTimer;
-//	private float _attackTimer;
-//
-//	//Move Health Later
-//	private float _maxHealth;
-//	private float _curHealth;
+	protected StackFSM _stateMachine;
+	protected List<Agent> _nearbyTargets;
+	protected Agent _target;
+	protected Vector3 _lastKnownPosition;
+	protected float _speed;
+	protected Timer _deathTimer;
+
+	protected Health _health;
+	protected FlagType _flag;
+	protected int _attackTypes;
 
 	private void Awake()
 	{
@@ -60,59 +90,46 @@ public class Agent : MonoBehaviour
 		_target = null;
 		_lastKnownPosition = Vector3.zero;
 		_speed = _navAgent.speed;
-		_searchTimer = SEARCH_DELAY;
-		_attackTimer = 0.0f;
-
-		_maxHealth = 100.0f;
-		_curHealth = _maxHealth;
+		_navAgent.speed = 0.0f;
+		_health = new Health (MaxHealth);
 	}
 
-	private void Start()
+	protected abstract void Setup ();
+
+	protected virtual void Start()
 	{
+		Setup ();
+		_deathTimer = new Timer(5.0f);
+		_deathTimer.OnTimeFinish += DeathTimer_OnTimeFinish;
+		_health.OnDie += Die;
 		_stateMachine.AddState(Init);
 	}
 
-	private void Update()
+	protected virtual void Update()
 	{
 		_stateMachine.Update();
+
+		_anim.SetBool("Walking", _navAgent.speed > 0.0f ? true : false);
+
+		if (_navAgent.remainingDistance <= _navAgent.stoppingDistance)
+		{
+			_navAgent.speed = 0.0f;
+		}
+		else
+		{
+			_navAgent.speed = _speed;
+		}
 	}
 
-	private void OnTriggerEnter(Collider other)
+	protected virtual void OnTriggerEnter(Collider other)
 	{
 		if (other.tag == "Agent")
 		{
 			Agent agent = other.gameObject.GetComponent<Agent>();
-
-			if (agent.mIsAlive)
-			{
-				switch (Flag)
-				{
-				//Knights don't like Ghost or Ghouls
-					case FlagType.Knight:
-						if (agent.Flag == FlagType.Ghost || agent.Flag == FlagType.Ghoul)
-							_nearbyTargets.Add(agent);
-						break;
-				//Orcs don't like Ghost or Ghouls
-					case FlagType.Orc:
-						if (agent.Flag == FlagType.Ghost || agent.Flag == FlagType.Ghoul)
-							_nearbyTargets.Add(agent);
-						break;
-				//Ghost don't like Knights or Orcs
-					case FlagType.Ghost:
-						if (agent.Flag == FlagType.Knight || agent.Flag == FlagType.Orc)
-							_nearbyTargets.Add(agent);
-						break;
-				//Ghouls don't like Knights or Orcs
-					case FlagType.Ghoul:
-						if (agent.Flag == FlagType.Knight || agent.Flag == FlagType.Orc)
-							_nearbyTargets.Add(agent);
-						break;
-				}
-			}
 		}
 	}
 
-	private void OnTriggerExit(Collider other)
+	protected virtual void OnTriggerExit(Collider other)
 	{
 		if (other.tag == "Agent")
 		{
@@ -123,252 +140,55 @@ public class Agent : MonoBehaviour
 		}
 	}
 
-	private void Init()
-	{
-		Move(false);
-
-		if (IsPlayer)
-			_stateMachine.AddState(CheckInput);
-		else if (Flag == FlagType.Orc)
-			_stateMachine.AddState(Follow);
-		else
-			_stateMachine.AddState(Wander);
-	}
-
-	private void CheckInput()
-	{
-		Move(false);
-
-		if (!IsPlayer)
-			_stateMachine.RemoveState();
-
-		if (TargetExist())
-		{
-			_stateMachine.AddState(Chase);
-		}
-		else if (_nearbyTargets.Count > 0)
-		{
-			foreach (Agent target in _nearbyTargets)
-			{
-				if (InRange(target.transform) && InSight(target.transform))
-					_target = target;
-			}
-		}
-	}
-
-	private void Follow()
-	{
-		if (TargetExist())
-		{
-			_stateMachine.AddState(Chase);
-		}
-		else
-		{
-			if (_nearbyTargets.Count > 0)
-			{
-				foreach (Agent target in _nearbyTargets)
-				{
-					if (InRange(target.transform) && InSight(target.transform))
-					{
-						_target = target;
-					}
-				}
-			}
-
-			_navAgent.SetDestination(MatchManager.Instance.Player.transform.position);
-
-			if (_navAgent.remainingDistance <= _navAgent.stoppingDistance)
-			{
-				Move(false);
-			}
-			else
-			{
-				Move(true);
-			}
-		}
-	}
-
-	private void Wander()
-	{
-		if (IsPlayer)
-			_stateMachine.RemoveState();
-
-		if (TargetExist())
-		{
-			_stateMachine.AddState(Chase);
-		}
-		else if (_nearbyTargets.Count > 0)
-		{
-			foreach (Agent target in _nearbyTargets)
-			{
-				if (InRange(target.transform) && InSight(target.transform))
-					_target = target;
-			}
-
-			if (_navAgent.remainingDistance <= _navAgent.stoppingDistance)
-			{
-				Move(false);
-			
-				if (_searchTimer > 0.0f)
-				{
-					_stateMachine.AddState(Search);
-				}
-				else
-				{
-					_searchTimer = SEARCH_DELAY;
-					_navAgent.SetDestination(transform.position + new Vector3(Random.Range(-10, 10), 0, Random.Range(-10, 10)));
-				}
-			}
-			else
-			{
-				Move(true);
-			}
-		}
-		else
-		{
-			_stateMachine.AddState(Sleep);
-		}
-	}
-
-	private void Search()
-	{
-		Move(false);
-
-		if (_anim.GetBool("Searching") != true)
-			_anim.SetBool("Searching", true);
-
-		_searchTimer -= Time.deltaTime;
-
-		if (_nearbyTargets.Count < 0 || _searchTimer <= 0.0f)
-		{
-			_anim.SetBool("Searching", false);
-			_stateMachine.RemoveState();
-		}
-	}
-
-	private void Sleep()
-	{
-		Move(false);
-
-		if (_anim.GetBool("Sleeping") != true)
-			_anim.SetBool("Sleeping", true);
-
-		if (_nearbyTargets.Count > 0)
-		{
-			_anim.SetBool("Sleeping", false);
-			_stateMachine.RemoveState();
-		}
-	}
-
-	private void Chase()
-	{
-		Move(true);
-
-		if (TargetExist())
-		{
-			if (InRange(_target.transform) && _target.mIsAlive)
-			{
-				_lastKnownPosition = _target.transform.position;
-			}
-			else
-			{
-				_target = null;
-			}
-		}
-
-		_navAgent.SetDestination(_lastKnownPosition);
-
-		if (_navAgent.remainingDistance <= _navAgent.stoppingDistance)
-		{
-			if (TargetExist())
-			{
-				_stateMachine.AddState(Attack);
-			}
-			else
-			{
-				_stateMachine.RemoveState();
-			}
-		}
-	}
-
-	private void Attack()
-	{
-		Move(false);
-
-		if (TargetExist())
-		{
-			transform.LookAt(_target.transform.position);
-
-			if (Vector3.Distance(transform.position, _target.transform.position) <= _navAgent.stoppingDistance)
-			{
-				if (_attackTimer > 0)
-				{
-					_attackTimer -= Time.deltaTime;
-				}
-				else
-				{
-					_anim.SetInteger("AttackType", (int) Random.Range(0, AttackTypes));
-					_anim.SetTrigger("Attack");
-					_attackTimer = ATTACK_DELAY;
-				}
-			}
-			else
-			{
-				_stateMachine.RemoveState();
-			}
-		}
-		else
-		{
-			_stateMachine.RemoveState();
-		}
-	}
-
-	private bool TargetExist()
+	protected bool TargetExist()
 	{
 		if (_target != null)
 		{
 			if (_target.mIsAlive)
+			{
 				return true;
+			}
 			else
+			{
+				if (_nearbyTargets.Contains(_target))
+				{
+					_nearbyTargets.Remove(_target);
+				}
+
 				_target = null;
+			}
 		}
 
 		return false;
 	}
 
-	private bool InRange(Transform target)
+	protected bool InRange(Transform target)
 	{
 		return (Vector3.Distance(transform.position, target.position) < _collider.radius);
 	}
 
-	private bool InSight(Transform target)
+	protected bool InSight(Transform target)
 	{
 		return (Vector3.Angle(transform.forward, target.transform.position - transform.position) < 45.0f);
 	}
 
-	private void Move(bool isTrue)
-	{
-		if (isTrue)
-		{
-			_anim.SetBool("Walking", true);
-			_navAgent.speed = _speed;
-		}
-		else
-		{
-			_anim.SetBool("Walking", false);
-			_navAgent.speed = 0;
-		}
-	}
-
 	private void Die()
 	{
-		if (_anim.GetBool("IsDead") == false)
-			_anim.SetBool("IsDead", true);
-		
-		Move(false);
+		_anim.SetBool("IsDead", true);
+		_navAgent.speed = 0.0f;
+		_deathTimer.Start();
 	}
 
-	public void DamageTarget(float damage)
+	private void DeathTimer_OnTimeFinish (Timer sender)
+	{
+		if (sender.Equals(_deathTimer))
+		{
+			_deathTimer.Reset();
+			//Match Manager will reuse this object <OBJECT POOLING>
+		}
+	}
+
+	public virtual void DamageTarget(float damage)
 	{
 		if (TargetExist())
 		{
@@ -376,17 +196,33 @@ public class Agent : MonoBehaviour
 		}
 	}
 
-	public void OnDamageReceived(Agent attacker, float amount)
+	public virtual void OnDamageReceived(Agent attacker, float amount)
 	{
-		_curHealth -= amount;
+		_health.RemoveHealth(amount);
 
 		if (!mIsAlive)
 		{
 			_stateMachine.AddState(Die);
 		}
-		Debug.LogFormat("{0}: {1}/{2}", Flag.ToString(), _curHealth, _maxHealth);
 
-		if (_target == null && attacker.mIsAlive)
-			_target = attacker;
+		if (attacker.mIsAlive)
+		{
+			if (_target != null)
+			{
+				float dist1 = Vector3.Distance(transform.position, _target.transform.position);
+				float dist2 = Vector3.Distance(transform.position, attacker.transform.position);
+
+				if (dist2 < dist1)
+				{
+					_target = attacker;
+				}
+			}
+			else
+			{
+				_target = attacker;
+			}
+		}
 	}
+
+	protected abstract void Init ();
 }
